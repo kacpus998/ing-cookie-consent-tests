@@ -1,0 +1,68 @@
+name: Cross-browser E2E
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: E2E (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Resolve test runtime dependencies
+        run: ./gradlew testClasses
+
+      - name: Install Playwright browser and system dependencies
+        env:
+          BROWSER: ${{ matrix.browser }}
+        run: |
+          cat > "$RUNNER_TEMP/playwright.init.gradle" <<'EOF'
+          allprojects {
+            tasks.register('installPlaywrightBrowser') {
+              doLast {
+                project.javaexec {
+                  classpath = project.configurations.testRuntimeClasspath
+                  mainClass = 'com.microsoft.playwright.CLI'
+                  args 'install', '--with-deps', project.findProperty('playwrightBrowser')
+                }
+              }
+            }
+          }
+          EOF
+          ./gradlew -I "$RUNNER_TEMP/playwright.init.gradle" installPlaywrightBrowser -PplaywrightBrowser="$BROWSER"
+
+      - name: Run ${{ matrix.browser }} E2E test
+        run: ./gradlew "${{ matrix.browser }}E2ETest"
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.browser }}-test-reports
+          path: |
+            build/test-results/cross-browser/${{ matrix.browser }}/
+            build/reports/tests/cross-browser/${{ matrix.browser }}/
+          if-no-files-found: warn
