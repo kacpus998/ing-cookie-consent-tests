@@ -43,10 +43,11 @@ jobs:
           allprojects {
             tasks.register('installPlaywrightBrowser') {
               doLast {
-                project.javaexec {
-                  classpath = project.configurations.testRuntimeClasspath
-                  mainClass = 'com.microsoft.playwright.CLI'
-                  args 'install', '--with-deps', project.findProperty('playwrightBrowser')
+                project.exec {
+                  commandLine "${System.getProperty('java.home')}/bin/java",
+                    '-cp', project.configurations.testRuntimeClasspath.asPath,
+                    'com.microsoft.playwright.CLI', 'install', '--with-deps',
+                    project.findProperty('playwrightBrowser')
                 }
               }
             }
