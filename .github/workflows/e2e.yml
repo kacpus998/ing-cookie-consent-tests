@@ -39,21 +39,14 @@ jobs:
         env:
           BROWSER: ${{ matrix.browser }}
         run: |
-          cat > "$RUNNER_TEMP/playwright.init.gradle" <<'EOF'
-          allprojects {
-            tasks.register('installPlaywrightBrowser') {
-              doLast {
-                project.exec {
-                  commandLine "${System.getProperty('java.home')}/bin/java",
-                    '-cp', project.configurations.testRuntimeClasspath.asPath,
-                    'com.microsoft.playwright.CLI', 'install', '--with-deps',
-                    project.findProperty('playwrightBrowser')
-                }
-              }
-            }
-          }
-          EOF
-          ./gradlew -I "$RUNNER_TEMP/playwright.init.gradle" installPlaywrightBrowser -PplaywrightBrowser="$BROWSER"
+          shopt -s globstar nullglob
+          runtime_jars=(~/.gradle/caches/modules-2/files-2.1/**/*.jar)
+          if [[ ${#runtime_jars[@]} -eq 0 ]]; then
+            echo "Gradle did not resolve the test runtime dependencies" >&2
+            exit 1
+          fi
+          runtime_classpath=$(IFS=:; printf '%s' "${runtime_jars[*]}")
+          java -cp "$runtime_classpath" com.microsoft.playwright.CLI install --with-deps "$BROWSER"
 
       - name: Run ${{ matrix.browser }} E2E test
         run: ./gradlew "${{ matrix.browser }}E2ETest"
