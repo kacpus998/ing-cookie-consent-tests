@@ -1,0 +1,24 @@
+# Gradle
+.gradle/
+build/
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+/bin/
+
+# Test and browser artifacts
+out/
+test-results/
+*.exec
+playwright/.cache/
+.reports/
+thoughts/
+
+# Operating systems
+.DS_Store
+Thumbs.db
