@@ -34,12 +34,10 @@ final class IngCookieConsentPage {
                 new Locator.GetByRoleOptions().setName("Dostosuj").setExact(true)).click();
     }
 
-    void enableAnalyticalCookies() {
+    void toggleAnalyticalCookies() {
         Locator analyticalSwitch = page.getByRole(AriaRole.SWITCH,
                 new Page.GetByRoleOptions().setName("Cookies analityczne").setExact(true));
-        if ("false".equals(analyticalSwitch.getAttribute("aria-checked"))) {
-            analyticalSwitch.click();
-        }
+        analyticalSwitch.click();
     }
 
     boolean analyticalCookiesAreEnabled() {
@@ -63,5 +61,9 @@ final class IngCookieConsentPage {
 
     boolean isClosed() {
         return !consentDialog.isVisible();
+    }
+
+    boolean isOpen() {
+        return consentDialog.isVisible();
     }
 }

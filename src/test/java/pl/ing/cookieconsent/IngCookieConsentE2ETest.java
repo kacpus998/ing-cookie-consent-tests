@@ -14,6 +14,7 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class IngCookieConsentE2ETest {
@@ -29,10 +30,15 @@ class IngCookieConsentE2ETest {
             var consentBanner = new IngCookieConsentPage(page);
 
             consentBanner.open();
+            assertTrue(consentBanner.isOpen(), "Consent dialog should be open for a fresh context");
+            assertTrue(consentBanner.consentCookieValue().isEmpty(),
+                    "Consent cookie should not exist before accepting the selection");
             consentBanner.customize();
-            consentBanner.enableAnalyticalCookies();
+            assertFalse(consentBanner.analyticalCookiesAreEnabled(),
+                    "Analytical cookies switch should start disabled");
+            consentBanner.toggleAnalyticalCookies();
             assertTrue(consentBanner.analyticalCookiesAreEnabled(),
-                    "Analytical cookies switch should be enabled before saving");
+                    "Clicking the analytical cookies switch should enable it");
             consentBanner.acceptSelected();
 
             assertTrue(consentBanner.isClosed(), "Consent dialog should close after saving");
@@ -49,7 +55,11 @@ class IngCookieConsentE2ETest {
 
     private static Stream<Arguments> selectedBrowser() {
         BrowserName selected = BrowserName.parse(System.getProperty("browser"));
-        return Stream.of(selected).map(Arguments::of);
+        return Stream.of(BrowserName.values())
+                .filter(browser -> selected == BrowserName.ALL
+                        ? browser != BrowserName.ALL
+                        : browser == selected)
+                .map(Arguments::of);
     }
 
     private static com.microsoft.playwright.BrowserType browserType(Playwright playwright,
@@ -58,6 +68,7 @@ class IngCookieConsentE2ETest {
             case CHROMIUM -> playwright.chromium();
             case FIREFOX -> playwright.firefox();
             case WEBKIT -> playwright.webkit();
+            case ALL -> throw new IllegalArgumentException("'all' is a selection mode, not a browser.");
         };
     }
 }
