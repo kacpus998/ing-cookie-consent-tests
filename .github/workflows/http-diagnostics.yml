@@ -1,0 +1,42 @@
+name: ING HTTP diagnostics
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  http-diagnostics:
+    name: Inspect ING HTTP response
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - name: Make one HTTP request and inspect response markers
+        shell: bash
+        run: |
+          set -euo pipefail
+          body_file="$(mktemp)"
+          trap 'rm -f "$body_file"' EXIT
+
+          # One curl invocation only; redirects are followed, with no retry.
+          curl --silent --show-error --location --max-redirs 10 \
+            --output "$body_file" \
+            --write-out 'HTTP_STATUS=%{http_code}\nFINAL_URL=%{url_effective}\nREDIRECT_COUNT=%{num_redirects}\n' \
+            https://www.ing.pl/
+
+          python3 - "$body_file" <<'PY'
+          from pathlib import Path
+          import sys
+
+          html = Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace")
+          markers = {
+              "ING_HTML_MARKER_title": "<title" in html.lower() and "ing" in html.lower(),
+              "ING_HTML_MARKER_domain": "ing.pl" in html.lower(),
+              "INCAPSULA_REQUEST_UNSUCCESSFUL": "Request unsuccessful" in html,
+              "INCAPSULA_INCIDENT_ID": "Incapsula incident ID" in html,
+          }
+          markers["INCAPSULA_RESOURCE_PATH"] = "/_Incapsula_Resource" in html
+          for name, found in markers.items():
+              print(f"{name}={'present' if found else 'absent'}")
+          PY
