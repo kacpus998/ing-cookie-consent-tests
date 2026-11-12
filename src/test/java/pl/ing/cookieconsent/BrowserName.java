@@ -12,10 +12,6 @@ enum BrowserName {
         this.displayName = displayName;
     }
 
-    String displayName() {
-        return displayName;
-    }
-
     @Override
     public String toString() {
         return displayName;

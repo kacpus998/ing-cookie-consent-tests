@@ -82,11 +82,16 @@ jobs:
           grep -F 'com.microsoft.playwright:playwright:1.51.0' build.gradle.kts
           test -x ./gradlew
 
-      - name: Run Chromium E2E
-        run: ./gradlew --no-daemon chromiumE2ETest
+      - name: Run all JUnit tests
+        run: ./gradlew --no-daemon test
 
-      - name: Run Firefox E2E
-        run: ./gradlew --no-daemon firefoxE2ETest
-
-      - name: Run WebKit E2E
-        run: ./gradlew --no-daemon webkitE2ETest
+      - name: Upload JUnit XML and HTML reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: controlled-e2e-test-reports-${{ github.run_id }}
+          path: |
+            build/test-results/test/
+            build/reports/tests/test/
+          if-no-files-found: warn
+          retention-days: 7

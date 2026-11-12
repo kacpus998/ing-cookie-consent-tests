@@ -3,6 +3,7 @@ package pl.ing.cookieconsent;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
+import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.options.AriaRole;
 import org.junit.jupiter.api.DisplayName;
@@ -25,8 +26,8 @@ class IngCookieConsentE2ETest {
         try (Playwright playwright = Playwright.create();
              Browser browser = browserType(playwright, browserName).launch(
                      new BrowserType.LaunchOptions().setHeadless(true));
-             BrowserContext context = browser.newContext()) {
-            var page = context.newPage();
+             BrowserContext context = browser.newContext();
+             Page page = context.newPage()) {
             var consentBanner = new IngCookieConsentPage(page);
 
             consentBanner.open();
