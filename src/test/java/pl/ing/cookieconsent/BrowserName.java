@@ -3,7 +3,8 @@ package pl.ing.cookieconsent;
 enum BrowserName {
     CHROMIUM("Chromium"),
     FIREFOX("Firefox"),
-    WEBKIT("WebKit");
+    WEBKIT("WebKit"),
+    ALL("All browsers");
 
     private final String displayName;
 
@@ -22,14 +23,15 @@ enum BrowserName {
 
     static BrowserName parse(String value) {
         if (value == null || value.isBlank()) {
-            return CHROMIUM;
+            return ALL;
         }
         return switch (value) {
             case "chromium" -> CHROMIUM;
             case "firefox" -> FIREFOX;
             case "webkit" -> WEBKIT;
+            case "all" -> ALL;
             default -> throw new IllegalArgumentException("Unsupported browser '" + value
-                    + "'. Supported values: chromium, firefox, webkit.");
+                    + "'. Supported values: chromium, firefox, webkit, all.");
         };
     }
 }
