@@ -1,9 +1,24 @@
 package pl.ing.cookieconsent;
 
 enum BrowserName {
-    CHROMIUM,
-    FIREFOX,
-    WEBKIT;
+    CHROMIUM("Chromium"),
+    FIREFOX("Firefox"),
+    WEBKIT("WebKit");
+
+    private final String displayName;
+
+    BrowserName(String displayName) {
+        this.displayName = displayName;
+    }
+
+    String displayName() {
+        return displayName;
+    }
+
+    @Override
+    public String toString() {
+        return displayName;
+    }
 
     static BrowserName parse(String value) {
         if (value == null || value.isBlank()) {

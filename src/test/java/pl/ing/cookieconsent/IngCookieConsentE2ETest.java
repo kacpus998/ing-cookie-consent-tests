@@ -5,18 +5,24 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.options.AriaRole;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class IngCookieConsentE2ETest {
-    @Test
-    void savesAnalyticalCookieConsentAcrossReload() {
+    @DisplayName("savesAnalyticalCookieConsentAcrossReload")
+    @ParameterizedTest(name = "{0} — {displayName}")
+    @MethodSource("selectedBrowser")
+    void savesAnalyticalCookieConsentAcrossReload(BrowserName browserName) {
         try (Playwright playwright = Playwright.create();
-             Browser browser = browserType(playwright).launch(
+             Browser browser = browserType(playwright, browserName).launch(
                      new BrowserType.LaunchOptions().setHeadless(true));
              BrowserContext context = browser.newContext()) {
             var page = context.newPage();
@@ -41,8 +47,14 @@ class IngCookieConsentE2ETest {
         }
     }
 
-    private static com.microsoft.playwright.BrowserType browserType(Playwright playwright) {
-        return switch (BrowserName.parse(System.getProperty("browser"))) {
+    private static Stream<Arguments> selectedBrowser() {
+        BrowserName selected = BrowserName.parse(System.getProperty("browser"));
+        return Stream.of(selected).map(Arguments::of);
+    }
+
+    private static com.microsoft.playwright.BrowserType browserType(Playwright playwright,
+                                                                     BrowserName browserName) {
+        return switch (browserName) {
             case CHROMIUM -> playwright.chromium();
             case FIREFOX -> playwright.firefox();
             case WEBKIT -> playwright.webkit();
