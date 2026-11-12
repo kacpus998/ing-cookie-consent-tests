@@ -4,12 +4,15 @@ import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.Response;
 import com.microsoft.playwright.options.AriaRole;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -28,28 +31,53 @@ class IngCookieConsentE2ETest {
              BrowserContext context = browser.newContext()) {
             var page = context.newPage();
             var consentBanner = new IngCookieConsentPage(page);
+            List<String> pageErrors = new ArrayList<>();
+            List<String> consoleErrors = new ArrayList<>();
+            List<String> navigationResponses = new ArrayList<>();
+            Response[] mainNavigationResponse = new Response[1];
 
-            consentBanner.open();
-            assertTrue(consentBanner.isOpen(), "Consent dialog should be open for a fresh context");
-            assertTrue(consentBanner.consentCookieValue().isEmpty(),
-                    "Consent cookie should not exist before accepting the selection");
-            consentBanner.customize();
-            assertFalse(consentBanner.analyticalCookiesAreEnabled(),
-                    "Analytical cookies switch should start disabled");
-            consentBanner.toggleAnalyticalCookies();
-            assertTrue(consentBanner.analyticalCookiesAreEnabled(),
-                    "Clicking the analytical cookies switch should enable it");
-            consentBanner.acceptSelected();
+            page.onPageError(pageErrors::add);
+            page.onConsoleMessage(message -> {
+                if ("error".equalsIgnoreCase(message.type())) {
+                    consoleErrors.add(message.text());
+                }
+            });
+            page.onResponse(response -> {
+                if (response.request().isNavigationRequest()
+                        && response.frame().equals(page.mainFrame())
+                        && mainNavigationResponse[0] == null) {
+                    mainNavigationResponse[0] = response;
+                    navigationResponses.add(E2EDiagnostics.redirectChain(response));
+                }
+            });
 
-            assertTrue(consentBanner.isClosed(), "Consent dialog should close after saving");
-            assertEquals("3", consentBanner.consentCookieValue().orElseThrow(),
-                    "Cookie value should represent analytical consent");
+            try {
+                consentBanner.open();
+                assertTrue(consentBanner.isOpen(), "Consent dialog should be open for a fresh context");
+                assertTrue(consentBanner.consentCookieValue().isEmpty(),
+                        "Consent cookie should not exist before accepting the selection");
+                consentBanner.customize();
+                assertFalse(consentBanner.analyticalCookiesAreEnabled(),
+                        "Analytical cookies switch should start disabled");
+                consentBanner.toggleAnalyticalCookies();
+                assertTrue(consentBanner.analyticalCookiesAreEnabled(),
+                        "Clicking the analytical cookies switch should enable it");
+                consentBanner.acceptSelected();
 
-            page.reload();
+                assertTrue(consentBanner.isClosed(), "Consent dialog should close after saving");
+                assertEquals("3", consentBanner.consentCookieValue().orElseThrow(),
+                        "Cookie value should represent analytical consent");
 
-            assertEquals("3", consentBanner.consentCookieValue().orElseThrow(),
-                    "Analytical consent should persist after reload");
-            assertTrue(consentBanner.isClosed(), "Saved consent should keep the banner closed");
+                page.reload();
+
+                assertEquals("3", consentBanner.consentCookieValue().orElseThrow(),
+                        "Analytical consent should persist after reload");
+                assertTrue(consentBanner.isClosed(), "Saved consent should keep the banner closed");
+            } catch (RuntimeException | AssertionError failure) {
+                E2EDiagnostics.capture(page, browserName, mainNavigationResponse[0],
+                        navigationResponses, pageErrors, consoleErrors);
+                throw failure;
+            }
         }
     }
 

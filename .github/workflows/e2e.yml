@@ -59,4 +59,5 @@ jobs:
           path: |
             build/test-results/cross-browser/${{ matrix.browser }}/
             build/reports/tests/cross-browser/${{ matrix.browser }}/
+            build/test-diagnostics/${{ matrix.browser }}/
           if-no-files-found: warn
