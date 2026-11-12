@@ -23,4 +23,5 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    systemProperty("browser", System.getProperty("browser", "chromium"))
 }

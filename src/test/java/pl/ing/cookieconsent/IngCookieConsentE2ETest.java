@@ -16,7 +16,7 @@ class IngCookieConsentE2ETest {
     @Test
     void savesAnalyticalCookieConsentAcrossReload() {
         try (Playwright playwright = Playwright.create();
-             Browser browser = playwright.chromium().launch(
+             Browser browser = browserType(playwright).launch(
                      new BrowserType.LaunchOptions().setHeadless(true));
              BrowserContext context = browser.newContext()) {
             var page = context.newPage();
@@ -39,5 +39,13 @@ class IngCookieConsentE2ETest {
                     "Analytical consent should persist after reload");
             assertTrue(consentBanner.isClosed(), "Saved consent should keep the banner closed");
         }
+    }
+
+    private static com.microsoft.playwright.BrowserType browserType(Playwright playwright) {
+        return switch (BrowserName.parse(System.getProperty("browser"))) {
+            case CHROMIUM -> playwright.chromium();
+            case FIREFOX -> playwright.firefox();
+            case WEBKIT -> playwright.webkit();
+        };
     }
 }
