@@ -11,6 +11,41 @@ permissions:
   contents: read
 
 jobs:
+  ing-http-diagnostics:
+    name: ING HTTP diagnostics
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - name: Make one HTTP request and inspect response markers
+        shell: bash
+        run: |
+          set -euo pipefail
+          body_file="$(mktemp)"
+          trap 'rm -f "$body_file"' EXIT
+
+          # One curl invocation follows redirects but never retries.
+          curl --silent --show-error --location --max-redirs 10 \
+            --output "$body_file" \
+            --write-out 'HTTP_STATUS=%{http_code}\nFINAL_URL=%{url_effective}\nREDIRECT_COUNT=%{num_redirects}\n' \
+            https://www.ing.pl/
+
+          python3 - "$body_file" <<'PY'
+          from pathlib import Path
+          import sys
+
+          html = Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace")
+          lower_html = html.lower()
+          markers = {
+              "ING_HTML_TITLE": "<title" in lower_html and "ing" in lower_html,
+              "ING_COOKIE_CONSENT_HEADING": "ing bank śląski" in lower_html,
+              "INCAPSULA_REQUEST_UNSUCCESSFUL": "request unsuccessful" in lower_html,
+              "INCAPSULA_INCIDENT_ID": "incapsula incident id" in lower_html,
+              "INCAPSULA_RESOURCE_PATH": "/_incapsula_resource" in lower_html,
+          }
+          for name, found in markers.items():
+              print(f"{name}={'present' if found else 'absent'}")
+          PY
+
   e2e:
     name: E2E (${{ matrix.browser }})
     runs-on: ubuntu-22.04
