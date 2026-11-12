@@ -36,17 +36,10 @@ jobs:
         run: ./gradlew testClasses
 
       - name: Install Playwright browser and system dependencies
-        env:
-          BROWSER: ${{ matrix.browser }}
-        run: |
-          shopt -s globstar nullglob
-          runtime_jars=(~/.gradle/caches/modules-2/files-2.1/**/*.jar)
-          if [[ ${#runtime_jars[@]} -eq 0 ]]; then
-            echo "Gradle did not resolve the test runtime dependencies" >&2
-            exit 1
-          fi
-          runtime_classpath=$(IFS=:; printf '%s' "${runtime_jars[*]}")
-          java -cp "$runtime_classpath" com.microsoft.playwright.CLI install --with-deps "$BROWSER"
+        run: ./gradlew installPlaywrightBrowsers
+
+      - name: Verify ${{ matrix.browser }} browser infrastructure
+        run: ./gradlew "${{ matrix.browser }}BrowserSmokeTest"
 
       - name: Run ${{ matrix.browser }} E2E test
         run: ./gradlew "${{ matrix.browser }}E2ETest"
@@ -59,5 +52,7 @@ jobs:
           path: |
             build/test-results/cross-browser/${{ matrix.browser }}/
             build/reports/tests/cross-browser/${{ matrix.browser }}/
+            build/test-results/browser-smoke/${{ matrix.browser }}/
+            build/reports/tests/browser-smoke/${{ matrix.browser }}/
             build/test-diagnostics/${{ matrix.browser }}/
           if-no-files-found: warn

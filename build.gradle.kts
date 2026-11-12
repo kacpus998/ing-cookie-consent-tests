@@ -27,7 +27,17 @@ tasks.test {
 }
 
 val e2eTestClass = "pl.ing.cookieconsent.IngCookieConsentE2ETest"
+val browserSmokeTestClass = "pl.ing.cookieconsent.BrowserInfrastructureSmokeTest"
 val testSourceSet = sourceSets.test.get()
+
+tasks.register<JavaExec>("installPlaywrightBrowsers") {
+    description = "Installs the Playwright browsers and Linux system dependencies used by the E2E tests."
+    group = "verification"
+    dependsOn(tasks.testClasses)
+    classpath = testSourceSet.runtimeClasspath
+    mainClass.set("com.microsoft.playwright.CLI")
+    args("install", "--with-deps", "chromium", "firefox", "webkit")
+}
 
 fun registerBrowserTest(browserName: String) = tasks.register<Test>("${browserName}E2ETest") {
     description = "Runs the ING E2E test in $browserName."
@@ -49,6 +59,27 @@ fun registerBrowserTest(browserName: String) = tasks.register<Test>("${browserNa
 val chromiumE2ETest = registerBrowserTest("chromium")
 val firefoxE2ETest = registerBrowserTest("firefox")
 val webkitE2ETest = registerBrowserTest("webkit")
+
+fun registerBrowserSmokeTest(browserName: String) = tasks.register<Test>("${browserName}BrowserSmokeTest") {
+    description = "Verifies Playwright can launch $browserName and interact with a local page."
+    group = "verification"
+    testClassesDirs = testSourceSet.output.classesDirs
+    classpath = testSourceSet.runtimeClasspath
+    useJUnitPlatform()
+    systemProperty("browser", browserName)
+    filter {
+        includeTestsMatching(browserSmokeTestClass)
+        isFailOnNoMatchingTests = true
+    }
+    reports {
+        junitXml.outputLocation = layout.buildDirectory.dir("test-results/browser-smoke/$browserName")
+        html.outputLocation = layout.buildDirectory.dir("reports/tests/browser-smoke/$browserName")
+    }
+}
+
+registerBrowserSmokeTest("chromium")
+registerBrowserSmokeTest("firefox")
+registerBrowserSmokeTest("webkit")
 
 firefoxE2ETest.configure { mustRunAfter(chromiumE2ETest) }
 webkitE2ETest.configure { mustRunAfter(firefoxE2ETest) }
