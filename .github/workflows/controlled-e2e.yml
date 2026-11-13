@@ -33,5 +33,6 @@ jobs:
             build/reports/tests/test/
             build/test-results/e2eTest/
             build/reports/tests/e2eTest/
+            build/diagnostics/
           if-no-files-found: warn
           retention-days: 7

@@ -10,6 +10,7 @@ import java.util.Optional;
 
 final class IngCookieConsentPage {
     private static final String URL = "https://www.ing.pl";
+    private static final String COOKIE_POLICY_ROOT = "#cpm-wrapper";
     private static final String CONSENT_HEADING = "ING Bank Śląski";
     private static final String SETTINGS_HEADING = "Ustawienia plików cookies i innych technologii";
 
@@ -33,12 +34,21 @@ final class IngCookieConsentPage {
     }
 
     void openSettings() {
-        if (consentDialog.isVisible()) {
-            button(consentDialog, "Dostosuj").click();
-        } else {
-            button(page, "Ustawienia cookie").click();
+        String before = settingsDiagnostics();
+        try {
+            if (consentDialog.isVisible()) {
+                button(consentDialog, "Dostosuj").click();
+            } else {
+                page.locator(COOKIE_POLICY_ROOT).waitFor(
+                        new Locator.WaitForOptions().setState(WaitForSelectorState.ATTACHED));
+                button(page, "Ustawienia cookie").click();
+            }
+            settingsDialog.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
+        } catch (RuntimeException failure) {
+            System.err.println("openSettings before interaction: " + before);
+            System.err.println("openSettings after interaction failure: " + settingsDiagnostics());
+            throw failure;
         }
-        settingsDialog.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
     }
 
     void acceptAll() {
@@ -101,6 +111,22 @@ final class IngCookieConsentPage {
 
     boolean settingsDialogIsVisible() {
         return settingsDialog.isVisible();
+    }
+
+    String settingsDiagnostics() {
+        try {
+            Locator settingsButton = button(page, "Ustawienia cookie");
+            Locator dialogs = page.getByRole(AriaRole.DIALOG);
+            return "url=" + page.url()
+                    + ", settingsButtonCount=" + settingsButton.count()
+                    + ", settingsButtonVisible=" + settingsButton.isVisible()
+                    + ", settingsButtonEnabled=" + settingsButton.isEnabled()
+                    + ", dialogCount=" + dialogs.count()
+                    + ", settingsDialogVisible=" + settingsDialog.isVisible()
+                    + ", dialogTexts=" + dialogs.allInnerTexts();
+        } catch (Throwable diagnosticFailure) {
+            return "diagnostic capture failed: " + diagnosticFailure;
+        }
     }
 
     private Locator analyticalSwitch() {

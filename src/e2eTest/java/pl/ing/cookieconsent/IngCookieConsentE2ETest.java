@@ -5,12 +5,18 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.Tracing;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import com.microsoft.playwright.options.WaitUntilState;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -80,7 +86,7 @@ class IngCookieConsentE2ETest {
             consent.openSettings();
             assertFalse(consent.analyticalCookiesAreEnabled());
             assertFalse(consent.marketingCookiesAreEnabled());
-        });
+        }, browserName == BrowserName.WEBKIT);
     }
 
     @DisplayName("accept all persists both optional categories")
@@ -138,7 +144,7 @@ class IngCookieConsentE2ETest {
             assertFalse(consent.analyticalCookiesAreEnabled());
             assertTrue(consent.marketingCookiesAreEnabled(),
                     "The changed preference should enable marketing without analytical consent");
-        });
+        }, browserName == BrowserName.WEBKIT);
     }
 
     @DisplayName("consent does not leak between browser contexts")
@@ -189,13 +195,84 @@ class IngCookieConsentE2ETest {
     }
 
     private static void withFreshPage(BrowserName browserName, ConsentScenario scenario) {
+        withFreshPage(browserName, scenario, false);
+    }
+
+    private static void withFreshPage(BrowserName browserName, ConsentScenario scenario,
+                                     boolean diagnoseCookieSettings) {
         try (Playwright playwright = Playwright.create();
              Browser browser = browserType(playwright, browserName).launch(
                      new BrowserType.LaunchOptions().setHeadless(true));
              BrowserContext context = browser.newContext();
              Page page = context.newPage()) {
-            scenario.run(context, page, new IngCookieConsentPage(page));
+            boolean trace = diagnoseCookieSettings;
+            List<String> browserErrors = new ArrayList<>();
+            if (trace) {
+                try {
+                    context.tracing().start(new Tracing.StartOptions()
+                            .setScreenshots(true)
+                            .setSnapshots(true));
+                    page.onConsoleMessage(message -> {
+                        if ("error".equals(message.type())) {
+                            browserErrors.add("console: " + message.text());
+                        }
+                    });
+                    page.onPageError(error -> browserErrors.add("pageerror: " + error));
+                    page.onRequestFailed(request -> browserErrors.add("requestfailed: "
+                            + request.method() + " " + request.url().split("\\?", 2)[0]
+                            + " — " + request.failure()));
+                } catch (RuntimeException diagnosticSetupFailure) {
+                    System.err.println("Could not start cookie-settings diagnostics: "
+                            + diagnosticSetupFailure.getMessage());
+                }
+            }
+
+            try {
+                scenario.run(context, page, new IngCookieConsentPage(page));
+            } catch (RuntimeException | Error failure) {
+                if (trace) {
+                    saveCookieSettingsDiagnostics(page, context, browserErrors, failure);
+                }
+                throw failure;
+            } finally {
+                if (trace) {
+                    try {
+                        context.tracing().stop();
+                    } catch (RuntimeException diagnosticStopFailure) {
+                        System.err.println("Could not stop cookie-settings trace: "
+                                + diagnosticStopFailure.getMessage());
+                    }
+                }
+            }
         }
+    }
+
+    private static void saveCookieSettingsDiagnostics(Page page, BrowserContext context,
+                                                      List<String> browserErrors, Throwable failure) {
+        Path diagnostics = Paths.get("build", "diagnostics");
+        try {
+            Files.createDirectories(diagnostics);
+        } catch (Exception diagnosticFailure) {
+            failure.addSuppressed(diagnosticFailure);
+        }
+
+        try {
+            Path screenshot = diagnostics.resolve("webkit-cookie-settings-failure.png");
+            page.screenshot(new Page.ScreenshotOptions().setPath(screenshot).setFullPage(true));
+            System.err.println("Cookie settings failure screenshot: " + screenshot);
+        } catch (Throwable diagnosticFailure) {
+            failure.addSuppressed(diagnosticFailure);
+        }
+
+        try {
+            Path trace = diagnostics.resolve("webkit-cookie-settings-failure.zip");
+            context.tracing().stop(new Tracing.StopOptions().setPath(trace));
+            System.err.println("Cookie settings failure trace: " + trace);
+        } catch (Throwable diagnosticFailure) {
+            failure.addSuppressed(diagnosticFailure);
+        }
+
+        System.err.println("Cookie settings browser errors: " + browserErrors);
     }
 
     @FunctionalInterface
