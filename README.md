@@ -1,90 +1,52 @@
-# ING Cookie Consent E2E Tests
+# ING Cookie Consent Tests
 
-## Overview
+Small Java 21 test project for the cookie-consent interface on [ing.pl](https://www.ing.pl). It uses JUnit 5, Gradle, and Playwright for Java 1.51.0; no additional test framework is used.
 
-This project verifies that analytical cookie consent on [www.ing.pl](https://www.ing.pl) can be changed and remains saved after a page reload. The JUnit 5 end-to-end tests run against Chromium, Firefox, and WebKit using Playwright for Java 1.51.0. The project uses Java 21 and Gradle Kotlin DSL; the Gradle Wrapper pins the Gradle version.
+## Test suites
 
-## Prerequisites
+- `src/test/java` contains unit tests. They test browser-name parsing only; `./gradlew test` does not launch a browser or contact ING.
+- `src/e2eTest/java` contains Playwright end-to-end tests and the consent Page Object. Each scenario gets an independent browser context and checks the live site.
 
-- JDK 21 (the JDK, including `javac`, is required; the Gradle toolchain targets Java 21).
-- Internet access to download Gradle/dependencies and Playwright browser binaries, and to reach ING's public website during E2E tests.
-- Playwright-compatible system libraries for the selected browser engines. On Linux, see [Linux system dependencies](#linux-system-dependencies).
-- No separately installed Gradle or Node.js is required. Use the included Wrapper (`./gradlew` or `gradlew.bat`); Playwright Java and its CLI are resolved through the project dependency.
+The E2E suite covers first-visit consent and access to settings, analytical-only consent, rejection of optional cookies, acceptance of all cookies, changing a saved choice, and isolation between browser contexts. The UI currently exposes separate analytical and marketing switches; tests verify that selecting one does not silently select the other. A separate “necessary only” scenario is omitted because saving the default optional-off settings duplicates the reject-all outcome.
 
-## Quick Start
+Consent cookie values are asserted only for choices confirmed through the live interface: `cookiePolicyGDPR=1` after “Odrzuć wszystkie” (neither optional category), `=3` after selecting analytical cookies only, `=2` after selecting marketing cookies only, and `=4` after “Zaakceptuj wszystkie” (both optional categories). These are observed values for the corresponding choices; tests also verify each category through its UI switch rather than assuming a universal bit mapping.
 
-```sh
-git clone <repository-url>
-cd ing-cookie-consent-tests
-java -version
-```
+## Requirements and setup
 
-Confirm that Java reports version 21, then install the three Playwright browsers and run tests:
+- JDK 21 (`java -version` should report 21).
+- Internet access to resolve Gradle/dependencies and reach ING for E2E tests.
+- Playwright browser system libraries on Linux, in addition to the downloaded browser binaries.
+- No separately installed Gradle or Node.js; use the included Gradle Wrapper.
+
+Install Chromium, Firefox, and WebKit before running E2E tests:
 
 ```sh
 ./gradlew playwrightInstall
-./gradlew test
 ```
 
-On Windows, use `gradlew.bat` instead. Browser binaries are installed explicitly; ordinary `test` runs do not download browsers.
-
-## Operating Systems
-
-### Linux
-
-Run the Wrapper commands above. Playwright browser executables require operating-system shared libraries in addition to the downloaded browser binaries. Playwright Java 1.51.0 supports installing these dependencies with its CLI:
+On Linux, Playwright dependencies can also be installed where package-manager access is allowed:
 
 ```sh
 ./gradlew playwrightInstall --args='install-deps chromium firefox webkit'
 ```
 
-This command may require administrator/root privileges to install packages via the system package manager. If you do not have those privileges, ask your system administrator to install the dependencies, or use a Linux environment/image where Playwright's browser dependencies are already present. `playwrightInstall` installs browser binaries only; it does not install OS packages.
-
-### Windows
-
-In Command Prompt or PowerShell, run:
-
-```bat
-git clone <repository-url>
-cd ing-cookie-consent-tests
-java -version
-gradlew.bat playwrightInstall
-gradlew.bat test
-```
-
-### macOS
-
-Run the Wrapper commands from Terminal:
+## Running tests
 
 ```sh
-./gradlew playwrightInstall
-./gradlew test
+./gradlew test       # unit tests only; no browser or ING access
+./gradlew e2eTest    # E2E in Chromium, Firefox, and WebKit
+./gradlew check      # unit and E2E suites
 ```
 
-## Running Tests
+To select a single browser for E2E diagnosis, use `-Dbrowser=chromium`, `-Dbrowser=firefox`, or `-Dbrowser=webkit`. The default is all three browsers.
 
-Run the complete suite (all three browsers):
+JUnit XML and HTML reports are written separately:
 
-```sh
-./gradlew test
-```
-
-To run only the ING E2E test for one browser, set the supported `browser` system property (`chromium`, `firefox`, `webkit`, or `all`):
-
-```sh
-./gradlew test -Dbrowser=firefox
-```
-
-JUnit XML results are written to `build/test-results/test/`; the HTML report is at `build/reports/tests/test/index.html`. Open the HTML file in a browser to inspect test outcomes and details.
+- Unit: `build/test-results/test/` and `build/reports/tests/test/index.html`
+- E2E: `build/test-results/e2eTest/` and `build/reports/tests/e2eTest/index.html`
 
 ## GitHub Actions
 
-The **Controlled E2E** workflow is started manually from GitHub Actions (`workflow_dispatch`) and runs the full JUnit suite on a controlled self-hosted runner. It uploads JUnit XML and HTML reports as a workflow artifact, including when tests fail. E2E tests depend on reaching ING and on the runner's installed browser binaries and system libraries; network policy, proxies, allowlists, or site-side automation protections can affect results. The workflow is intentionally not a substitute for a locally controlled network environment.
+**Controlled E2E** is manual-only (`workflow_dispatch`), is restricted to `main`, and runs `./gradlew check` on the existing self-hosted `ing-e2e` runner. It includes all three E2E browsers and uploads unit and E2E JUnit XML/HTML reports even when tests fail. It is not triggered by pushes or pull requests.
 
-## Troubleshooting
-
-- **JDK 21 is missing or the wrong version is active:** install/select a JDK 21 and verify with `java -version`. Ensure `JAVA_HOME` and `PATH` point to it.
-- **Playwright reports a missing browser executable:** run `./gradlew playwrightInstall` (or `gradlew.bat playwrightInstall` on Windows), then retry `test`.
-- **Linux reports missing shared libraries:** run the `install-deps` command above in an environment where package installation is permitted, or ask an administrator to install Playwright's browser dependencies. The browser installation task alone does not provide these libraries.
-- **ING blocks automation or the consent dialog is unavailable:** the site may apply security controls or behave differently for your network. Check access in a regular browser and retry from an approved network; do not attempt to bypass the site's protections.
-- **Need diagnostic details:** inspect Gradle console output, `build/test-results/test/` (XML), and `build/reports/tests/test/index.html` (HTML). On GitHub Actions, download the `controlled-e2e-test-reports-*` artifact from the workflow run.
+The E2E tests depend on live ING availability and the runner's installed Playwright browsers/system libraries. Network policy or site-side controls may affect results; do not bypass them.
