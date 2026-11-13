@@ -9,6 +9,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import com.microsoft.playwright.options.WaitUntilState;
 
 import java.util.stream.Stream;
 
@@ -54,7 +55,7 @@ class IngCookieConsentE2ETest {
             assertFalse(consent.consentDialogIsVisible(), "Saving selected preferences should close the dialog");
             assertEquals("3", consent.consentCookieValue().orElseThrow(),
                     "The observed analytical-only choice is stored as cookiePolicyGDPR=3");
-            page.reload();
+            reload(page);
             assertFalse(consent.consentDialogIsVisible(), "The saved decision should survive reload");
             consent.openSettings();
             assertTrue(consent.analyticalCookiesAreEnabled());
@@ -74,7 +75,7 @@ class IngCookieConsentE2ETest {
             assertEquals("1", consent.consentCookieValue().orElseThrow(),
                     "Live observation of Odrzuć wszystkie stores cookiePolicyGDPR=1");
 
-            page.reload();
+            reload(page);
             assertFalse(consent.consentDialogIsVisible(), "Rejected consent should persist after reload");
             consent.openSettings();
             assertFalse(consent.analyticalCookiesAreEnabled());
@@ -96,7 +97,7 @@ class IngCookieConsentE2ETest {
             assertTrue(consent.analyticalCookiesAreEnabled());
             assertTrue(consent.marketingCookiesAreEnabled());
 
-            page.reload();
+            reload(page);
             assertFalse(consent.consentDialogIsVisible(), "Acceptance should persist after reload");
             assertEquals("4", consent.consentCookieValue().orElseThrow(),
                     "The all-categories decision should retain its observed value after reload");
@@ -129,7 +130,7 @@ class IngCookieConsentE2ETest {
             assertEquals("2", changedValue,
                     "The live marketing-only choice is stored as cookiePolicyGDPR=2");
 
-            page.reload();
+            reload(page);
             assertFalse(consent.consentDialogIsVisible(), "The changed decision should persist after reload");
             assertEquals(changedValue, consent.consentCookieValue().orElseThrow(),
                     "The changed stored decision should be stable after reload");
@@ -181,6 +182,10 @@ class IngCookieConsentE2ETest {
             case WEBKIT -> playwright.webkit();
             case ALL -> throw new IllegalArgumentException("'all' is a selection mode, not a browser.");
         };
+    }
+
+    private static void reload(Page page) {
+        page.reload(new Page.ReloadOptions().setWaitUntil(WaitUntilState.DOMCONTENTLOADED));
     }
 
     private static void withFreshPage(BrowserName browserName, ConsentScenario scenario) {
